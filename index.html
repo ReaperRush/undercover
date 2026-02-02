@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Welcome</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    :root{
+      --bg: #0a0b10;
+      --card: rgba(255,255,255,0.06);
+      --stroke: rgba(255,255,255,0.12);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.65);
+      --accent: rgba(255,255,255,0.95);
+      --red: rgba(255, 30, 30, 0.98);
+    }
+    *{ box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 800px at 15% 10%, rgba(255,255,255,0.06), transparent 60%),
+        radial-gradient(900px 600px at 85% 90%, rgba(255,255,255,0.05), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      overflow: hidden;
+      transition: filter 120ms linear;
+    }
+
+    .wrap{
+      width: min(980px, 100%);
+      display: grid;
+      gap: 16px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .card{
+      border: 1px solid var(--stroke);
+      background: var(--card);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+    }
+
+    h1{
+      margin: 0 0 10px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      font-size: clamp(28px, 4vw, 44px);
+    }
+    .muted{
+      color: var(--muted);
+      margin: 0 0 16px;
+      line-height: 1.45;
+    }
+
+    .btn{
+      width: 100%;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.08);
+      color: var(--accent);
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,0.10); }
+    .btn:active{ transform: translateY(0px) scale(0.99); }
+
+    #stage2{
+      display:none;
+      gap: 14px;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .pill{
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,0.07);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    #map{
+      height: 380px;
+      border-radius: 16px;
+      overflow:hidden;
+      border: 1px solid var(--stroke);
+      position: relative;
+    }
+
+    .message{
+      font-size: 18px;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .message strong{ color: var(--accent); }
+
+    /* Full-screen danger overlay */
+    #dangerOverlay{
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 3;
+      transition: opacity 180ms ease;
+    }
+    #dangerOverlay.on{ opacity: 1; }
+
+    .dangerIcon{
+      position: absolute;
+      font-size: clamp(20px, 3.2vw, 54px);
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,0.55));
+      animation: pop 520ms cubic-bezier(.2,.9,.2,1) forwards, drift 2.6s ease-in-out infinite;
+      transform: scale(0.4);
+      opacity: 0;
+      user-select: none;
+    }
+    @keyframes pop{
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes drift{
+      0% { translate: 0 0; }
+      50% { translate: 0 -8px; }
+      100% { translate: 0 0; }
+    }
+
+    /* Flash effect */
+    .flash{
+      animation: flash 120ms linear infinite;
+    }
+    @keyframes flash{
+      0%   { filter: brightness(1); }
+      50%  { filter: brightness(2.0) contrast(1.1); }
+      100% { filter: brightness(1); }
+    }
+
+    /* Center alert text (reused for both messages) */
+    #centerAlert{
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      z-index: 9999;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: clamp(28px, 5vw, 68px);
+      color: var(--red);
+      text-align: center;
+      text-shadow:
+        0 0 18px rgba(255, 30, 30, 0.45),
+        0 16px 70px rgba(0,0,0,0.65);
+      opacity: 0;
+      pointer-events: none;
+      user-select: none;
+      padding: 0 14px;
+      white-space: nowrap;
+    }
+    #centerAlert.on{
+      animation: centerPop 1.1s ease-out forwards;
+    }
+    @keyframes centerPop{
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.75); }
+      15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+      55%  { opacity: 1; transform: translate(-50%, -50%) scale(1.00); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+    }
+
+    /* Impact boom marker (Leaflet divIcon content) */
+    .boom{
+      width: 90px;
+      height: 90px;
+      position: relative;
+      transform: translate(-45px, -45px);
+      pointer-events: none;
+      filter: drop-shadow(0 14px 28px rgba(0,0,0,0.6));
+    }
+    .boom .emoji{
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-size: 34px;
+      opacity: 0;
+      animation: boomPop 850ms ease-out forwards;
+    }
+    .boom::before,
+    .boom::after{
+      content: "";
+      position: absolute;
+      inset: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%) scale(0.6);
+      border: 2px solid rgba(255, 40, 40, 0.95);
+      opacity: 0;
+    }
+    .boom::before{
+      animation: ring 900ms ease-out forwards;
+    }
+    .boom::after{
+      border-color: rgba(255,255,255,0.75);
+      animation: ring 900ms ease-out 110ms forwards;
+    }
+    @keyframes ring{
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+      15%  { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(6.2); }
+    }
+    @keyframes boomPop{
+      0%   { opacity: 0; transform: scale(0.6); }
+      20%  { opacity: 1; transform: scale(1.1); }
+      65%  { opacity: 1; transform: scale(1.0); }
+      100% { opacity: 0; transform: scale(0.95); }
+    }
+
+    /* Quick shake (applied to body and map) */
+    .shake{
+      animation: shake 420ms ease-in-out;
+    }
+    @keyframes shake{
+      0%   { transform: translate(0,0); }
+      15%  { transform: translate(2px,-2px); }
+      30%  { transform: translate(-3px,2px); }
+      45%  { transform: translate(3px,1px); }
+      60%  { transform: translate(-2px,1px); }
+      75%  { transform: translate(2px,-1px); }
+      100% { transform: translate(0,0); }
+    }
+
+    /* Agent card */
+    #agentCard{
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      width: min(340px, calc(100vw - 36px));
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(10,11,16,0.72);
+      border-radius: 18px;
+      padding: 14px 14px 12px;
+      z-index: 4;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+      display: none;
+    }
+    #agentCard.on{ display: block; }
+    .agentTop{
+      display:flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .agentTitle{
+      margin: 0;
+      font-size: 14px;
+      color: rgba(255,255,255,0.72);
+    }
+    .agentLine{
+      margin: 4px 0 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .agentSvg{
+      width: 78px;
+      height: 62px;
+      flex: 0 0 auto;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+    }
+    .agentNote{
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.35;
+    }
+
+    .fineprint{
+      font-size: 12px;
+      color: rgba(255,255,255,0.50);
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="dangerOverlay" aria-hidden="true"></div>
+  <div id="centerAlert" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <div class="card" id="stage1">
+      <h1>Welcome, Pihu.</h1>
+      <p class="muted">You have been formally invited by Agent Rush to help him in defeating [REDACTED].</p>
+      <button class="btn" id="goBtn">Click here</button>
+      <div class="fineprint"></div>
+    </div>
+
+    <div class="card" id="stage2">
+      <div class="row">
+        <div class="pill" id="latPill">Latitude: ...</div>
+        <div class="pill" id="lngPill">Longitude: ...</div>
+        <div class="pill" id="statusPill">Status: idle</div>
+      </div>
+
+      <div id="map"></div>
+
+      <p class="message" id="msg">Target acquired: <strong>Thane West</strong>.</p>
+    </div>
+  </div>
+
+  <div id="agentCard" aria-hidden="true">
+    <div class="agentTop">
+      <div class="agentSvg" title="Agent">
+        <svg viewBox="0 0 160 120" width="78" height="62" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="160" height="120" fill="url(#g)"/>
+          <path d="M22 72 C28 55, 55 48, 78 48 L102 48 C122 48, 132 56, 138 72 L146 72 C150 72, 152 75, 152 80 L152 88 C152 93, 148 96, 143 96 L20 96 C14 96, 10 92, 10 86 L10 80 C10 75, 13 72, 18 72 Z"
+                fill="rgba(255,255,255,0.78)"/>
+          <path d="M44 70 C49 57, 62 54, 78 54 L96 54 C110 54, 117 58, 123 70 Z"
+                fill="rgba(10,11,16,0.85)"/>
+          <circle cx="86" cy="60" r="10" fill="rgba(255,255,255,0.85)"/>
+          <rect x="78" y="58" width="8" height="4" rx="2" fill="rgba(10,11,16,0.95)"/>
+          <rect x="88" y="58" width="8" height="4" rx="2" fill="rgba(10,11,16,0.95)"/>
+          <rect x="86" y="59.4" width="2" height="1.2" fill="rgba(10,11,16,0.95)"/>
+          <circle cx="44" cy="96" r="12" fill="rgba(10,11,16,0.85)"/>
+          <circle cx="120" cy="96" r="12" fill="rgba(10,11,16,0.85)"/>
+          <circle cx="44" cy="96" r="5" fill="rgba(255,255,255,0.65)"/>
+          <circle cx="120" cy="96" r="5" fill="rgba(255,255,255,0.65)"/>
+        </svg>
+      </div>
+      <div>
+        <p class="agentTitle">Undercover unit</p>
+        <p class="agentLine">Agent Rushil: initiating launch</p>
+      </div>
+    </div>
+    <p class="agentNote"></p>
+  </div>
+
+  <!-- Put an audio file named alarm.mp3 next to this HTML -->
+  <audio id="alarmAudio" preload="auto">
+    <source src="alarm.mp3" type="audio/mpeg">
+    <source src="alarm.wav" type="audio/wav">
+  </audio>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    const goBtn = document.getElementById("goBtn");
+    const stage1 = document.getElementById("stage1");
+    const stage2 = document.getElementById("stage2");
+    const latPill = document.getElementById("latPill");
+    const lngPill = document.getElementById("lngPill");
+    const statusPill = document.getElementById("statusPill");
+    const msg = document.getElementById("msg");
+    const dangerOverlay = document.getElementById("dangerOverlay");
+    const agentCard = document.getElementById("agentCard");
+    const centerAlert = document.getElementById("centerAlert");
+    const alarmAudio = document.getElementById("alarmAudio");
+
+    const POWAI = { lat: 19.1164, lng: 72.90471 };
+    const THANE_WEST = { lat: 19.226662, lng: 72.983833 };
+
+    let map, startMarker, targetMarker;
+    let rocketLines = [];
+    let rocketMarkers = [];
+    let boomMarker = null;
+
+    function startFlash(){ document.body.classList.add("flash"); }
+    function stopFlash(){ document.body.classList.remove("flash"); }
+
+    function flashCenterText(text){
+      centerAlert.textContent = text;
+      centerAlert.classList.remove("on");
+      void centerAlert.offsetWidth;
+      centerAlert.classList.add("on");
+    }
+
+    function shakeOnce(){
+      document.body.classList.remove("shake");
+      const mapEl = document.getElementById("map");
+      mapEl.classList.remove("shake");
+      void document.body.offsetWidth;
+
+      document.body.classList.add("shake");
+      mapEl.classList.add("shake");
+
+      setTimeout(() => {
+        document.body.classList.remove("shake");
+        mapEl.classList.remove("shake");
+      }, 450);
+    }
+
+    function clearDanger(){
+      dangerOverlay.innerHTML = "";
+      dangerOverlay.classList.remove("on");
+    }
+
+    function spawnDangerIcons(count = 95){
+      dangerOverlay.innerHTML = "";
+      dangerOverlay.classList.add("on");
+
+      const icons = ["❗", "⚠️", "☢️", "⛔", "🚨"];
+      for (let i = 0; i < count; i++){
+        const el = document.createElement("div");
+        el.className = "dangerIcon";
+        el.textContent = icons[Math.floor(Math.random() * icons.length)];
+
+        el.style.left = (Math.random() * 100) + "vw";
+        el.style.top = (Math.random() * 100) + "vh";
+        el.style.animationDelay = (Math.random() * 0.35) + "s";
+        el.style.transform = `scale(${0.35 + Math.random() * 0.95}) rotate(${(Math.random() * 30 - 15)}deg)`;
+        dangerOverlay.appendChild(el);
+      }
+    }
+
+    function initMap(){
+      if (map) return;
+
+      map = L.map("map", { zoomControl: false, scrollWheelZoom: false });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
+
+      startMarker = L.marker([POWAI.lat, POWAI.lng]).addTo(map).bindPopup("Powai");
+      targetMarker = L.marker([THANE_WEST.lat, THANE_WEST.lng]).addTo(map).bindPopup("Thane West");
+
+      const bounds = L.latLngBounds([[POWAI.lat, POWAI.lng],[THANE_WEST.lat, THANE_WEST.lng]]);
+      map.fitBounds(bounds.pad(0.35));
+
+      setTimeout(() => map.invalidateSize(), 60);
+    }
+
+    function clearRockets(){
+      for (const l of rocketLines) map.removeLayer(l);
+      for (const m of rocketMarkers) map.removeLayer(m);
+      rocketLines = [];
+      rocketMarkers = [];
+    }
+
+    function clearBoom(){
+      if (boomMarker){
+        map.removeLayer(boomMarker);
+        boomMarker = null;
+      }
+    }
+
+    function makeArcPoints(start, end, bend = 0.18, steps = 95){
+      const lat1 = start[0], lng1 = start[1];
+      const lat2 = end[0], lng2 = end[1];
+
+      const midLat = (lat1 + lat2) / 2;
+      const midLng = (lng1 + lng2) / 2;
+
+      const dLat = lat2 - lat1;
+      const dLng = lng2 - lng1;
+
+      const ctrlLat = midLat + (-dLng) * bend;
+      const ctrlLng = midLng + ( dLat) * bend;
+
+      const pts = [];
+      for (let i = 0; i <= steps; i++){
+        const t = i / steps;
+        const a = (1 - t) * (1 - t);
+        const b = 2 * (1 - t) * t;
+        const c = t * t;
+        const lat = a * lat1 + b * ctrlLat + c * lat2;
+        const lng = a * lng1 + b * ctrlLng + c * lng2;
+        pts.push([lat, lng]);
+      }
+      return pts;
+    }
+
+    function impactBoomAtThane(){
+      clearBoom();
+
+      const icon = L.divIcon({
+        className: "",
+        html: `<div class="boom"><div class="emoji">💥</div></div>`,
+        iconSize: [0,0]
+      });
+
+      boomMarker = L.marker([THANE_WEST.lat, THANE_WEST.lng], { icon }).addTo(map);
+
+      shakeOnce();
+
+      setTimeout(() => {
+        clearBoom();
+      }, 1200);
+    }
+
+    function spawnSpaceRocketsFromPowai(count = 7){
+      clearRockets();
+      clearBoom();
+
+      const start = [POWAI.lat, POWAI.lng];
+      const target = [THANE_WEST.lat, THANE_WEST.lng];
+
+      const bounds = L.latLngBounds([start, target]);
+      map.fitBounds(bounds.pad(0.35));
+
+      let finished = 0;
+
+      for (let i = 0; i < count; i++){
+        const bend = (0.10 + Math.random() * 0.28) * (i % 2 === 0 ? 1 : -1);
+        const arc = makeArcPoints(start, target, bend, 98);
+
+        const line = L.polyline(arc, {
+          color: "#ff2a2a",
+          weight: 4,
+          opacity: 0.92,
+          dashArray: "10 10"
+        }).addTo(map);
+        rocketLines.push(line);
+
+        const rocketIcon = L.divIcon({
+          className: "",
+          html: `<div style="font-size: 22px; filter: drop-shadow(0 10px 18px rgba(0,0,0,0.55));">🚀</div>`,
+          iconSize: [22,22],
+          iconAnchor: [11,11]
+        });
+
+        const marker = L.marker(arc[0], { icon: rocketIcon }).addTo(map);
+        rocketMarkers.push(marker);
+
+        const delayMs = i * 180;
+        setTimeout(() => {
+          const totalMs = 2600 + Math.floor(Math.random() * 1200);
+          const tickMs = 30;
+          const steps = Math.floor(totalMs / tickMs);
+          let s = 0;
+
+          const timer = setInterval(() => {
+            s++;
+            const p = Math.min(1, s / steps);
+            const idx = Math.floor(p * (arc.length - 1));
+            marker.setLatLng(arc[idx]);
+
+            if (p >= 1){
+              clearInterval(timer);
+              finished++;
+
+              if (finished >= count){
+                impactBoomAtThane();
+                statusPill.textContent = "Status: impact";
+                msg.innerHTML = '<strong>Impact registered</strong> at <strong>Thane West</strong>.';
+              }
+            }
+          }, tickMs);
+        }, delayMs);
+      }
+    }
+
+    async function playTriggeredSound(){
+      try{
+        alarmAudio.currentTime = 0;
+        await alarmAudio.play();
+      } catch (e){
+        // If autoplay is blocked, user can click again.
+      }
+    }
+
+    goBtn.addEventListener("click", async () => {
+      stage1.style.display = "none";
+      stage2.style.display = "grid";
+
+      latPill.textContent = "Latitude: " + THANE_WEST.lat.toFixed(6);
+      lngPill.textContent = "Longitude: " + THANE_WEST.lng.toFixed(6);
+      statusPill.textContent = "Status: scanning";
+
+      initMap();
+
+      spawnDangerIcons();
+      agentCard.classList.add("on");
+      startFlash();
+
+      playTriggeredSound();
+
+      // Flash 1: ENEMY LOCATION DETECTED
+      flashCenterText("ENEMY LOCATION DETECTED");
+      msg.innerHTML = 'ENEMY LOCATION DETECTED: <strong>Thane West</strong>.';
+
+      // Flash 2: THANE WEST (same style)
+      setTimeout(() => {
+        flashCenterText("THANE WEST");
+        shakeOnce();
+      }, 1150);
+
+      // Launch rockets shortly after the second flash
+      setTimeout(() => {
+        statusPill.textContent = "Status: launching";
+        msg.innerHTML = 'Sending <strong>space rockets to <strong>Thane West</strong>.';
+        spawnSpaceRocketsFromPowai(7);
+      }, 2250);
+
+      setTimeout(() => { dangerOverlay.classList.remove("on"); }, 5200);
+      setTimeout(() => { clearDanger(); stopFlash(); }, 6200);
+    });
+  </script>
+</body>
+</html>
